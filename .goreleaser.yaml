@@ -1,4 +1,9 @@
 project_name: elemental
+
+env:
+  - REGISTRY={{ if index .Env "REGISTRY"  }}{{ .Env.REGISTRY }}{{ else }}ghcr.io/llmos-ai{{ end }}
+  - VERSION={{ if index .Env "VERSION"  }}{{ .Env.VERSION }}{{ else }}{{ .Env.GITHUB_REF_NAME }}{{ end }}
+
 builds:
   - env:
       - CGO_ENABLED=0
@@ -11,31 +16,19 @@ builds:
     goarch:
       - amd64
       - arm64
-      - riscv64
     goarm:
       - 8
-signs:
-  - cmd: cosign
-    signature: "${artifact}.sig"
-    certificate: "${artifact}.pem"
-    args: ["sign-blob", "--oidc-issuer=https://token.actions.githubusercontent.com", "--output-certificate=${certificate}", "--output-signature=${signature}", "${artifact}"]
-    artifacts: all
+
 source:
   enabled: true
   name_template: '{{ .ProjectName }}-{{ .Tag }}-source'
-archives:
-  # Default template uses underscores instead of -
-  - name_template: "{{ .ProjectName }}-{{ .Tag }}-{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
-    replacements:
-      darwin: Darwin
-      linux: Linux
-      windows: Windows
-      386: i386
-      amd64: x86_64
+
 checksum:
   name_template: '{{ .ProjectName }}-{{ .Tag }}-checksums.txt'
+
 snapshot:
   name_template: "{{ .Tag }}-next"
+
 changelog:
   sort: asc
   filters:
@@ -43,3 +36,45 @@ changelog:
       - '^docs:'
       - '^test:'
       - '^Merge pull request'
+
+dockers:
+  - use: buildx
+    goos: linux
+    goarch: amd64
+    dockerfile: Dockerfile-toolkit
+    image_templates:
+      - "{{ .Env.REGISTRY }}/elemental-toolkit:{{ .Env.VERSION }}-amd64"
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Env.VERSION}}"
+      - "--label=org.opencontainers.image.source=https://github.com/llmos-ai/elemental-toolkit"
+      - "--platform=linux/amd64"
+
+  - use: buildx
+    goos: linux
+    goarch: arm64
+    dockerfile: Dockerfile-toolkit
+    image_templates:
+      - "{{ .Env.REGISTRY }}/elemental-toolkit:{{ .Env.VERSION }}-arm64"
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Env.VERSION}}"
+      - "--label=org.opencontainers.image.source=https://github.com/llmos-ai/elemental-toolkit"
+      - "--platform=linux/arm64"
+
+docker_manifests:
+  - use: docker
+    name_template: "{{ .Env.REGISTRY }}/elemental-toolkit:{{ .Env.VERSION }}"
+    image_templates:
+      - "{{ .Env.REGISTRY }}/elemental-toolkit:{{ .Env.VERSION }}-amd64"
+      - "{{ .Env.REGISTRY }}/elemental-toolkit:{{ .Env.VERSION }}-arm64"
+
+docker_signs:
+  - artifacts: all
+    stdin: "{{ .Env.COSIGN_PASSWORD }}"

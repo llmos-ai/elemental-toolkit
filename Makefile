@@ -60,8 +60,16 @@ push-toolkit:
 	$(DOCKER) push $(TOOLKIT_REPO):$(VERSION)
 
 .PHONY: build-cli
-build-cli:
-	go build -ldflags '$(LDFLAGS)' -o build/elemental
+#build-cli:
+#	go build -ldflags '$(LDFLAGS)' -o build/elemental
+build-cli: ## build elemental CLI
+	VERSION=$(VERSION) \
+	goreleaser release --snapshot --clean
+
+.PHONY: release-cli
+release-cli: ## build elemental CLI
+	VERSION=$(VERSION) \
+	goreleaser release --clean
 
 .PHONY: build-os
 build-os: build
